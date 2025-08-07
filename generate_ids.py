@@ -1,11 +1,12 @@
-# generate_ids.py
+import os
+from PIL import Image, ImageDraw, ImageFont
+from fpdf import FPDF
+from pcdb import PCDB  # Your SQL database class
 
 def generate_ids(photo_folder_path):
-    import os
-    from PIL import Image, ImageDraw, ImageFont
-    from fpdf import FPDF
-
-    OUTPUT_FOLDER = r"C:\Users\Noureen Heikal\Desktop\StudentID\output"
+    # Constants and paths
+    desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
+    OUTPUT_FOLDER = os.path.join(desktop_path, "StudentID", "output")
     FRONT_TEMPLATE = "ID Design front.jpg"
     BACK_TEMPLATE = "ID Design back.jpg"
     FONT_PATH = "arial.ttf"
@@ -13,25 +14,11 @@ def generate_ids(photo_folder_path):
 
     RESIZE_DIMENSIONS = (4372, 3456)
     FINAL_WIDTH = 3772
-    CROP_AMOUNT = 600
     MASK_SIZE = (520, 520)
 
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
-    # Sample student data (you can later connect to real data)
-    students = [
-        {
-            "PEOPLE_ID": "242500033",
-            "Eng_FullName": "Noureen Hatem",
-            "CURRICULUM": "Computing and Digital Technology"
-        },
-        {
-            "PEOPLE_ID": "242500036",
-            "Eng_FullName": "Salma Zeyad",
-            "CURRICULUM": "Business Administration"
-        }
-    ]
-
+    # Util: create circular masked image
     def create_masked_image(photo, mask_path, mask_size):
         mask = Image.open(mask_path).convert("L").resize(mask_size)
         photo = photo.convert("RGBA").resize(mask_size)
@@ -42,19 +29,34 @@ def generate_ids(photo_folder_path):
     def left_text(draw, text, font, x, y, fill="black"):
         draw.text((x, y), text, font=font, fill=fill)
 
-    for student in students:
-        try:
-            sid = student["PEOPLE_ID"].strip()
-            name = student["Eng_FullName"].strip()
-            major = student["CURRICULUM"].strip()
+    db = PCDB()  # Connect to database
 
-            photo_path = os.path.join(photo_folder_path, f"{sid}.jpg")
-            if not os.path.exists(photo_path):
-                print(f"❌ Photo not found for {sid}")
+    # Loop through photo files
+    for filename in os.listdir(photo_folder_path):
+        if not filename.lower().endswith(".jpg"):
+            continue
+
+        sid = os.path.splitext(filename)[0].strip()  # Extract student ID from filename
+
+        try:
+            # Fetch student info from DB using the ID
+            student_data = db.fetch_student(student_credentials="", db_intake=sid)
+            if not student_data:
+                print(f"❌ No student data found for ID: {sid}")
                 continue
 
-            photo = Image.open(photo_path)
+            # Get relevant fields from first result row
+            row = student_data[0]
+            name = row.Eng_FullName.strip()
+            major = row.CURRICULUM.strip()
 
+            photo_path = os.path.join(photo_folder_path, filename)
+            if not os.path.exists(photo_path):
+                print(f"❌ Photo not found: {photo_path}")
+                continue
+
+            # Load and process photo
+            photo = Image.open(photo_path)
             if photo.size != RESIZE_DIMENSIONS and photo.size[0] > FINAL_WIDTH:
                 photo = photo.resize(RESIZE_DIMENSIONS, Image.LANCZOS)
 
@@ -93,4 +95,5 @@ def generate_ids(photo_folder_path):
             print(f"✅ Saved: {output_path}")
 
         except Exception as e:
-            print(f"❌ Error processing {sid}: {e}")
+            print(f"❌ Error processing ID {sid}: {e}")
+
