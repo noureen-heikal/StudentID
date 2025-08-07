@@ -18,6 +18,12 @@ def generate_ids(photo_folder_path):
 
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
+    def split_name(stName: str):
+        names=[]
+        for name in stName.split(" "):
+            names.append(name)
+        return names
+
     # Util: create circular masked image
     def create_masked_image(photo, mask_path, mask_size):
         mask = Image.open(mask_path).convert("L").resize(mask_size)
@@ -40,15 +46,21 @@ def generate_ids(photo_folder_path):
 
         try:
             # Fetch student info from DB using the ID
-            student_data = db.fetch_student(student_credentials="", db_intake=sid)
+
+            student_data = db.fetch_student("",sid)[0]
             if not student_data:
                 print(f"❌ No student data found for ID: {sid}")
                 continue
 
             # Get relevant fields from first result row
-            row = student_data[0]
-            name = row.Eng_FullName.strip()
-            major = row.CURRICULUM.strip()
+            name = split_name(student_data[1])
+            major = student_data[8]
+            
+            name_first=name[0]
+            name_second=name[1]
+            
+            
+            
 
             photo_path = os.path.join(photo_folder_path, filename)
             if not os.path.exists(photo_path):
@@ -76,7 +88,7 @@ def generate_ids(photo_folder_path):
             font = ImageFont.truetype(FONT_PATH, 26)
             y_start = 150 + MASK_SIZE[1] + 5
             spacing = 28
-            left_text(draw, name, font, 105, y_start)
+            left_text(draw, name_first + " " + name_second, font, 105, y_start)
             left_text(draw, major, font, 105, y_start + spacing)
             left_text(draw, sid, font, 105, y_start + spacing * 2)
 
@@ -90,10 +102,11 @@ def generate_ids(photo_folder_path):
             pdf.add_page()
             pdf.image("temp_back.jpg", x=0, y=0, w=210, h=297)
 
-            output_path = os.path.join(OUTPUT_FOLDER, f"{name} - {sid}.pdf")
+            output_path = os.path.join(OUTPUT_FOLDER, f"{name_first} {name_second} - {sid}.pdf")
             pdf.output(output_path)
             print(f"✅ Saved: {output_path}")
 
         except Exception as e:
             print(f"❌ Error processing ID {sid}: {e}")
-
+    # Close connection
+    db.close_connection()

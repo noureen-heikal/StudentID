@@ -4,11 +4,11 @@ class PCDB:
     def __init__(self):
         # Connects to the PCDB_PROD SQL Server database
         self.connection = pyodbc.connect(
-            'DRIVER={ODBC Driver 18 for SQL Server};'
+            'DRIVER={ODBC Driver 17 for SQL Server};'
             'SERVER=172.16.16.13;'
             'DATABASE=PCDB_PROD;'
             'UID=hassan;'
-            'PWD=Eslsca1234'
+            'PWD=Eslsca1234;'
             'TrustServerCertificate=yes;'
         )
         
@@ -74,7 +74,8 @@ WHERE PEOPLE_ID LIKE '{db_intake}%' OR [Personal Email] = '{student_credentials}
         self.cursor.execute(query)
         result = self.cursor.fetchall()
 
-        # Close connection
-        self.connection.close()
 
         return result
+
+    def close_connection(self):
+        self.connection.close()
