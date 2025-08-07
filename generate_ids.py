@@ -1,96 +1,96 @@
-import os
-from PIL import Image, ImageDraw, ImageFont
-from fpdf import FPDF
+# generate_ids.py
 
-# Paths
-PHOTO_FOLDER = r"C:\Users\Noureen Heikal\Desktop\StudentID\Student photos"
-OUTPUT_FOLDER = r"C:\Users\Noureen Heikal\Desktop\StudentID\output"
-FRONT_TEMPLATE = "ID Design front.jpg"
-BACK_TEMPLATE = "ID Design back.jpg"
-FONT_PATH = "arial.ttf"  # Adjust if not in script folder
-MASK_PATH = "bubble_mask.png"  # Use your custom bubble mask
+def generate_ids(photo_folder_path):
+    import os
+    from PIL import Image, ImageDraw, ImageFont
+    from fpdf import FPDF
 
-# Create output folder if it doesn't exist
-os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+    OUTPUT_FOLDER = r"C:\Users\Noureen Heikal\Desktop\StudentID\output"
+    FRONT_TEMPLATE = "ID Design front.jpg"
+    BACK_TEMPLATE = "ID Design back.jpg"
+    FONT_PATH = "arial.ttf"
+    MASK_PATH = "bubble_mask.png"
 
-# Sample student data
-students = [
-    {
-        "PEOPLE_ID": "242500033",
-        "Eng_FullName": "Noureen Hatem",
-        "CURRICULUM": "Computing and digital technology"
-    },
-    {
-        "PEOPLE_ID": "242500036",
-        "Eng_FullName": "Salma Zeyad",
-        "CURRICULUM": "Business Administration"
-    }
-]
+    RESIZE_DIMENSIONS = (4372, 3456)
+    FINAL_WIDTH = 3772
+    CROP_AMOUNT = 600
+    MASK_SIZE = (520, 520)
 
-# Center text helper
-def center_text(draw, text, font, y, image_width):
-    bbox = font.getbbox(text)
-    text_width = bbox[2] - bbox[0]
-    x = (image_width - text_width) // 2
-    draw.text((x, y), text, fill="black", font=font)
+    os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
-# Use the bubble-shaped mask for the photo
-def create_masked_image(photo, mask_path, size):
-    mask = Image.open(mask_path).convert("L").resize(size)
-    photo = photo.resize(size).convert("RGBA")
-    result = Image.new("RGBA", size)
-    result.paste(photo, (0, 0), mask=mask)
-    return result
+    # Sample student data (you can later connect to real data)
+    students = [
+        {
+            "PEOPLE_ID": "242500033",
+            "Eng_FullName": "Noureen Hatem",
+            "CURRICULUM": "Computing and Digital Technology"
+        },
+        {
+            "PEOPLE_ID": "242500036",
+            "Eng_FullName": "Salma Zeyad",
+            "CURRICULUM": "Business Administration"
+        }
+    ]
 
-# Generate IDs
-for student in students:
-    try:
-        name = student["Eng_FullName"].strip()
-        major = student["CURRICULUM"].strip()
-        sid = student["PEOPLE_ID"].strip()
+    def create_masked_image(photo, mask_path, mask_size):
+        mask = Image.open(mask_path).convert("L").resize(mask_size)
+        photo = photo.convert("RGBA").resize(mask_size)
+        result = Image.new("RGBA", mask_size)
+        result.paste(photo, (0, 0), mask=mask)
+        return result
 
-        # Load photo
-        photo_path = os.path.join(PHOTO_FOLDER, f"{sid}.jpg")
-        if not os.path.exists(photo_path):
-            print(f"Photo not found for {sid}")
-            continue
+    def left_text(draw, text, font, x, y, fill="black"):
+        draw.text((x, y), text, font=font, fill=fill)
 
-        # Load templates
-        front = Image.open(FRONT_TEMPLATE).convert("RGBA")
-        back = Image.open(BACK_TEMPLATE).convert("RGB")
+    for student in students:
+        try:
+            sid = student["PEOPLE_ID"].strip()
+            name = student["Eng_FullName"].strip()
+            major = student["CURRICULUM"].strip()
 
-        # Prepare and paste masked photo
-        photo = Image.open(photo_path)
-        photo_size = (520, 520)  # Wider to match bubble
-        masked_photo = create_masked_image(photo, MASK_PATH, photo_size)
+            photo_path = os.path.join(photo_folder_path, f"{sid}.jpg")
+            if not os.path.exists(photo_path):
+                print(f"❌ Photo not found for {sid}")
+                continue
 
-        # Adjust paste position
-        photo_x, photo_y = 105, 150
-        front.paste(masked_photo, (photo_x, photo_y), mask=masked_photo)
+            photo = Image.open(photo_path)
 
-        # Draw text under photo
-        draw = ImageDraw.Draw(front)
-        font = ImageFont.truetype(FONT_PATH, 26)
+            if photo.size != RESIZE_DIMENSIONS and photo.size[0] > FINAL_WIDTH:
+                photo = photo.resize(RESIZE_DIMENSIONS, Image.LANCZOS)
 
-        text_start_y = photo_y + photo_size[1] + 10  # Start under photo
-        center_text(draw, name, font, text_start_y, front.width)
-        center_text(draw, major, font, text_start_y + 35, front.width)
-        center_text(draw, sid, font, text_start_y + 70, front.width)
+            if photo.size[0] == RESIZE_DIMENSIONS[0]:
+                photo = photo.crop((0, 0, FINAL_WIDTH, RESIZE_DIMENSIONS[1]))
 
-        # Save to PDF
-        front_rgb = front.convert("RGB")
-        front_rgb.save("temp_front.jpg")
-        back.save("temp_back.jpg")
+            photo.save(photo_path)
+            photo = Image.open(photo_path)
 
-        pdf_path = os.path.join(OUTPUT_FOLDER, f"{name} - {sid}.pdf")
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.image("temp_front.jpg", x=0, y=0, w=210, h=297)
-        pdf.add_page()
-        pdf.image("temp_back.jpg", x=0, y=0, w=210, h=297)
-        pdf.output(pdf_path)
+            front = Image.open(FRONT_TEMPLATE).convert("RGBA")
+            back = Image.open(BACK_TEMPLATE).convert("RGB")
 
-        print(f"Saved: {pdf_path}")
+            masked_photo = create_masked_image(photo, MASK_PATH, MASK_SIZE)
+            front.paste(masked_photo, (105, 150), mask=masked_photo)
 
-    except Exception as e:
-        print(f"Error with {sid}: {e}")
+            draw = ImageDraw.Draw(front)
+            font = ImageFont.truetype(FONT_PATH, 26)
+            y_start = 150 + MASK_SIZE[1] + 5
+            spacing = 28
+            left_text(draw, name, font, 105, y_start)
+            left_text(draw, major, font, 105, y_start + spacing)
+            left_text(draw, sid, font, 105, y_start + spacing * 2)
+
+            front_rgb = front.convert("RGB")
+            front_rgb.save("temp_front.jpg")
+            back.save("temp_back.jpg")
+
+            pdf = FPDF()
+            pdf.add_page()
+            pdf.image("temp_front.jpg", x=0, y=0, w=210, h=297)
+            pdf.add_page()
+            pdf.image("temp_back.jpg", x=0, y=0, w=210, h=297)
+
+            output_path = os.path.join(OUTPUT_FOLDER, f"{name} - {sid}.pdf")
+            pdf.output(output_path)
+            print(f"✅ Saved: {output_path}")
+
+        except Exception as e:
+            print(f"❌ Error processing {sid}: {e}")
