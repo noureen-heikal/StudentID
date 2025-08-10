@@ -2,7 +2,7 @@
 
 import tkinter as tk
 from tkinter import filedialog, messagebox
-from generate_ids import generate_ids  # Your backend function
+from generate_ids import generate_ids, send_ids # Your backend function
 import threading  # To prevent freezing during long operations
 
 def browse_folder():
@@ -21,8 +21,9 @@ def run_generator():
 
     def task():
         try:
-            generate_ids(folder)
-            status_label.config(text="✅ Student ID cards generated successfully!", fg="green")
+            email_to_pdf, output_folder = generate_ids(folder)
+            send_ids(email_to_pdf, output_folder)
+            status_label.config(text="✅ Student ID cards generated successfully & emails sent!", fg="green")
             messagebox.showinfo("Success", "Student ID cards generated successfully!")
         except Exception as e:
             status_label.config(text="❌ Error occurred during generation.", fg="red")
@@ -91,6 +92,9 @@ generate_button = tk.Button(
     height=2
 )
 generate_button.pack(pady=(30, 10))
+
+
+
 
 # ---------- Status Label ----------
 status_label = tk.Label(

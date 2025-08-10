@@ -3,8 +3,34 @@ from PIL import Image, ImageDraw, ImageFont
 from fpdf import FPDF
 from pcdb import PCDB  # Your SQL database class
 from tkinter import Tk, Button, messagebox
+import requests
+import base64
 
+def send_email_using_mailing_service(dataToSend):
+    baseurl = "http://172.16.16.136:6005/"
 
+    authToken = requests.post(url = baseurl + "auth/start-session/").json()
+
+    headers = {"Content-Type": "application/json", "Authorization" : "Token " + authToken["Token"]}
+
+    emailResponse = requests.post(url = baseurl + "mail/send-mail/", headers = headers, json = dataToSend)
+
+    requests.delete(url = baseurl + "auth/stop-session/")
+
+def send_email(to_email, pdf_bytes, pdf_filename, student_name):
+    
+    dataToSend = {
+                "AppName": "IDs Generator",
+                "Template": "ID Generation Template",
+                "Receiver": to_email,
+                "pdf_bytes":  base64.b64encode(pdf_bytes).decode("utf-8"),
+                "pdf_filename": pdf_filename,
+                "Details": {
+                     "studentName": student_name
+                }
+            }
+   
+    send_email_using_mailing_service(dataToSend)
 
 def generate_ids(photo_folder_path):
     # Constants and paths
@@ -124,6 +150,7 @@ def generate_ids(photo_folder_path):
     
     
     
+    
 #### see dictionary in a readable format
     print("\n📧 Linking Email to PDF:")
     for email, pdf_file in email_to_pdf.items():
@@ -132,7 +159,7 @@ def generate_ids(photo_folder_path):
     return email_to_pdf,OUTPUT_FOLDER
 
 def send_ids(email_to_pdf, output_folder):
-    outlook = win32.Dispatch('outlook.application') ###replace with mailing part 
+     ###replace with mailing part 
     failed = []
 
     for email, pdf_filename in email_to_pdf.items():
@@ -141,15 +168,12 @@ def send_ids(email_to_pdf, output_folder):
             if not os.path.exists(pdf_path):
                 failed.append(email)
                 continue
+            with open(pdf_path, "rb") as pdf_file:
+                pdf_bytes = pdf_file.read()
+                send_email(email, pdf_bytes, pdf_filename, pdf_filename.split("-")[0].strip())
 
-            mail = outlook.CreateItem(0)  # New email
-            mail.To = email
-            mail.Subject = "Your Student ID Card"
-            mail.Body = "Dear Student,\n\nPlease find attached your student ID card.\n\nRegards,\nStudent Affairs Office"
-            mail.Attachments.Add(pdf_path)
-            mail.Send()
-
-        except Exception:
+        except Exception as e:
+            print(f"❌ Error sending email to {email}: {e}")
             failed.append(email)
 
     if failed:
@@ -158,21 +182,9 @@ def send_ids(email_to_pdf, output_folder):
         messagebox.showinfo("Done", "All student ID emails sent successfully!")
 
 
-if __name__ == "__main__":
-    photo_folder = r"C:\Users\Noureen Heikal\Desktop\Student photos"
-    email_to_pdf, output_folder = generate_ids(photo_folder)
+# if __name__ == "__main__":
+#     photo_folder = r"C:\Users\Noureen Heikal\Desktop\Student photos"
+#     email_to_pdf, output_folder = generate_ids(photo_folder)
 
-    root = Tk()
-    root.title("Student ID Sender")
 
-    send_button = Button(
-        root,
-        text="Send ID by StudentMail",
-        command=lambda: send_ids(email_to_pdf, output_folder),
-        bg="blue",
-        fg="white",
-        font=("Arial", 12)
-    )
-    send_button.pack(pady=20, padx=20)
 
-    root.mainloop()
