@@ -19,10 +19,7 @@ def generate_ids(photo_folder_path):
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
     def split_name(stName: str):
-        names=[]
-        for name in stName.split(" "):
-            names.append(name)
-        return names
+        return stName.split(" ")
 
     # Util: create circular masked image
     def create_masked_image(photo, mask_path, mask_size):
@@ -37,6 +34,9 @@ def generate_ids(photo_folder_path):
 
     db = PCDB()  # Connect to database
 
+    # Emoty Dictionary
+    email_to_pdf = {}
+
     # Loop through photo files
     for filename in os.listdir(photo_folder_path):
         if not filename.lower().endswith(".jpg"):
@@ -46,21 +46,17 @@ def generate_ids(photo_folder_path):
 
         try:
             # Fetch student info from DB using the ID
-
-            student_data = db.fetch_student("",sid)[0]
+            student_data = db.fetch_student("", sid)[0]
             if not student_data:
                 print(f"❌ No student data found for ID: {sid}")
                 continue
 
-            # Get relevant fields from first result row
-            name = split_name(student_data[1])
+            email = student_data[5]
+            # Get relevant fields
+            name_parts = split_name(student_data[1])
+            name_first = name_parts[0]
+            name_second = name_parts[1] if len(name_parts) > 1 else ""
             major = student_data[8]
-            
-            name_first=name[0]
-            name_second=name[1]
-            
-            
-            
 
             photo_path = os.path.join(photo_folder_path, filename)
             if not os.path.exists(photo_path):
@@ -78,6 +74,7 @@ def generate_ids(photo_folder_path):
             photo.save(photo_path)
             photo = Image.open(photo_path)
 
+            # Prepare templates
             front = Image.open(FRONT_TEMPLATE).convert("RGBA")
             back = Image.open(BACK_TEMPLATE).convert("RGB")
 
@@ -88,25 +85,50 @@ def generate_ids(photo_folder_path):
             font = ImageFont.truetype(FONT_PATH, 26)
             y_start = 150 + MASK_SIZE[1] + 5
             spacing = 28
-            left_text(draw, name_first + " " + name_second, font, 105, y_start)
+            left_text(draw, f"{name_first} {name_second}", font, 105, y_start)
             left_text(draw, major, font, 105, y_start + spacing)
             left_text(draw, sid, font, 105, y_start + spacing * 2)
 
+            # Save temp files
             front_rgb = front.convert("RGB")
             front_rgb.save("temp_front.jpg")
             back.save("temp_back.jpg")
 
+            # Generate PDF
             pdf = FPDF()
             pdf.add_page()
             pdf.image("temp_front.jpg", x=0, y=0, w=210, h=297)
             pdf.add_page()
             pdf.image("temp_back.jpg", x=0, y=0, w=210, h=297)
-
-            output_path = os.path.join(OUTPUT_FOLDER, f"{name_first} {name_second} - {sid}.pdf")
+            
+            
+            
+            ### Formats file name 
+            output_filename = f"{name_first} {name_second} - {sid}.pdf"
+            output_path = os.path.join(OUTPUT_FOLDER, output_filename)
+            ##save pdf in full path 
             pdf.output(output_path)
             print(f"✅ Saved: {output_path}")
 
+            # Linking Email to Pdf file if email exists
+            if email:
+                email_to_pdf[email] = output_filename
+
         except Exception as e:
             print(f"❌ Error processing ID {sid}: {e}")
-    # Close connection
+
     db.close_connection()
+    
+    
+    
+#### see dictionary in a readable format
+    print("\n📧 Linking Email to PDF:")
+    for email, pdf_file in email_to_pdf.items():
+        print(f"{email} : {pdf_file}")
+
+    return email_to_pdf
+
+
+if __name__ == "__main__":
+    photo_folder = r"C:\Users\Noureen Heikal\Desktop\Student photos"
+    email_pdf_map = generate_ids(photo_folder)
