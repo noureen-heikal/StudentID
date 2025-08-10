@@ -2,6 +2,9 @@ import os
 from PIL import Image, ImageDraw, ImageFont
 from fpdf import FPDF
 from pcdb import PCDB  # Your SQL database class
+from tkinter import Tk, Button, messagebox
+
+
 
 def generate_ids(photo_folder_path):
     # Constants and paths
@@ -51,7 +54,7 @@ def generate_ids(photo_folder_path):
                 print(f"❌ No student data found for ID: {sid}")
                 continue
 
-            email = student_data[5]
+            email = student_data[3]
             # Get relevant fields
             name_parts = split_name(student_data[1])
             name_first = name_parts[0]
@@ -126,9 +129,50 @@ def generate_ids(photo_folder_path):
     for email, pdf_file in email_to_pdf.items():
         print(f"{email} : {pdf_file}")
 
-    return email_to_pdf
+    return email_to_pdf,OUTPUT_FOLDER
+
+def send_ids(email_to_pdf, output_folder):
+    outlook = win32.Dispatch('outlook.application') ###replace with mailing part 
+    failed = []
+
+    for email, pdf_filename in email_to_pdf.items():
+        try:
+            pdf_path = os.path.join(output_folder, pdf_filename)
+            if not os.path.exists(pdf_path):
+                failed.append(email)
+                continue
+
+            mail = outlook.CreateItem(0)  # New email
+            mail.To = email
+            mail.Subject = "Your Student ID Card"
+            mail.Body = "Dear Student,\n\nPlease find attached your student ID card.\n\nRegards,\nStudent Affairs Office"
+            mail.Attachments.Add(pdf_path)
+            mail.Send()
+
+        except Exception:
+            failed.append(email)
+
+    if failed:
+        messagebox.showwarning("Done", f"Some emails failed: {failed}")
+    else:
+        messagebox.showinfo("Done", "All student ID emails sent successfully!")
 
 
 if __name__ == "__main__":
     photo_folder = r"C:\Users\Noureen Heikal\Desktop\Student photos"
-    email_pdf_map = generate_ids(photo_folder)
+    email_to_pdf, output_folder = generate_ids(photo_folder)
+
+    root = Tk()
+    root.title("Student ID Sender")
+
+    send_button = Button(
+        root,
+        text="Send ID by StudentMail",
+        command=lambda: send_ids(email_to_pdf, output_folder),
+        bg="blue",
+        fg="white",
+        font=("Arial", 12)
+    )
+    send_button.pack(pady=20, padx=20)
+
+    root.mainloop()
